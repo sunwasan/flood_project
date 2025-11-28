@@ -1,0 +1,85 @@
+services:
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    command: http host.docker.internal:8000
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040" # ngrok web UI
+    restart: unless-stopped
+    networks:
+      - flood_network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - flood_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: flood_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=report_db
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_HOST_AUTH=trust
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flood_network
+  api:
+    container_name: flood_api
+    image: flood_api:latest
+    build:
+      context: .
+      dockerfile: build/Dockerfile.api
+    ports:
+      - "8000:8000"
+    networks:
+      - flood_network
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/app/data
+      - PYTHON_DIR=/app/python
+      - MODEL_DIR=/app/model
+      - API_DIR=/app/api
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=report_db
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_HOST_AUTH=trust
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    volumes:
+      - ./api:/app/api
+      - ./model:/app/model
+      - ./python:/app/python
+      - ./data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+
+
+networks:
+  flood_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

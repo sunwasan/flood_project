@@ -1,0 +1,36 @@
+FROM python:3.12-slim
+
+# Install system dependencies for geospatial libraries
+RUN apt-get update && apt-get install -y \
+    binutils \
+    libproj-dev \
+    gdal-bin \
+    libgdal-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies
+RUN uv sync --frozen --no-install-project
+
+# Add virtual environment to PATH
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app"
+
+# Copy application code
+COPY api ./api
+COPY model ./model
+COPY python ./python
+COPY data ./data
+
+# Expose port
+EXPOSE 8000
+
+# Run the application
+CMD ["python", "api/main.py"]
